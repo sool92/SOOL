@@ -15,3 +15,8 @@
     </div>
 </body>
 </html>
+document.addEventListener('mousemove', (e) => {
+    const heart = document.querySelector('body::before');
+    document.body.style.setProperty('--mouse-x', e.clientX + 'px');
+    document.body.style.setProperty('--mouse-y', e.clientY + 'px');
+});
