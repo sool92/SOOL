@@ -16,23 +16,52 @@ body, html {
 }
 
 .section {
-    width: calc(50% - 40px); /* Adjust width considering margin and padding */
+    width: calc(50% - 40px);
     margin: 10px;
     padding: 20px;
-    background-color: rgba(255, 255, 255, 0.8);
-    border: 1px solid #ddd;
+    background-color: #fff;
+    border: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Adds shadow to the sections */
     box-sizing: border-box;
     text-align: left;
+    position: relative; /* Needed for absolute positioning of the heart */
+    overflow: hidden; /* Keeps the heart effect within the section bounds */
 }
 
 .section a {
     text-decoration: none;
     color: black;
+    display: block; /* Makes the link cover the whole section */
+}
+
+/* Heart effect on hover */
+.section:hover::before {
+    content: '❤';
+    font-size: 100px;
+    color: red;
+    position: absolute;
+    opacity: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    animation: heart-burst 0.5s ease forwards;
+}
+
+@keyframes heart-burst {
+    50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1);
+    }
 }
 
 /* Responsive layout for smaller screens */
 @media screen and (max-width: 600px) {
     .section {
-        width: calc(100% - 40px); /* Full width minus margin and padding */
+        width: calc(100% - 40px);
     }
 }
+
