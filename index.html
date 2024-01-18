@@ -39,3 +39,41 @@
     }
   </style>
 </head>
+
+
+  <!DOCTYPE html>
+<html>
+<head>
+  <title>鼠标特效是小爱心</title>
+  <style>
+    body {
+      background: linear-gradient(to right, #FFFF66, #FF99FF);
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+    #cursor {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: red;
+      z-index: 999;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="cursor"></div>
+
+  <script>
+    const cursor = document.getElementById("cursor");
+
+    document.addEventListener("mousemove", (e) => {
+      cursor.style.top = e.pageY + "px";
+      cursor.style.left = e.pageX + "px";
+    });
+  </script>
+</body>
