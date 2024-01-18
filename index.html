@@ -3,20 +3,31 @@
 <head>
     <title>个人网页</title>
     <link rel="stylesheet" type="text/css" href="style.css">
+    <style>
+        /* Additional CSS for heart effect */
+        body::before {
+            left: var(--mouse-x);
+            top: var(--mouse-y);
+        }
+    </style>
 </head>
 <body>
+
     <div class="container">
-        <div class="section" id="section1"><a href="https://bolg.soolnas.top/index.html">板块1</a></div>
-        <div class="section" id="section2"><a href="https://bolg.soolnas.top/index.html">板块2</a></div>
-        <div class="section" id="section3"><a href="https://bolg.soolnas.top/index.html">板块3</a></div>
-        <div class="section" id="section4"><a href="https://bolg.soolnas.top/index.html">板块4</a></div>
-        <div class="section" id="section5"><a href="https://bolg.soolnas.top/index.html">板块5</a></div>
-        <div class="section" id="section6"><a href="https://bolg.soolnas.top/index.html">板块6</a></div>
+        <div class="section" id="section1"><a href="page1.html">板块1</a></div>
+        <div class="section" id="section2"><a href="page2.html">板块2</a></div>
+        <div class="section" id="section3"><a href="page3.html">板块3</a></div>
+        <div class="section" id="section4"><a href="page4.html">板块4</a></div>
+        <div class="section" id="section5"><a href="page5.html">板块5</a></div>
+        <div class="section" id="section6"><a href="page6.html">板块6</a></div>
     </div>
+
+    <script>
+        document.addEventListener('mousemove', (e) => {
+            document.body.style.setProperty('--mouse-x', e.clientX + 'px');
+            document.body.style.setProperty('--mouse-y', e.clientY + 'px');
+        });
+    </script>
+
 </body>
 </html>
-document.addEventListener('mousemove', (e) => {
-    const heart = document.querySelector('body::before');
-    document.body.style.setProperty('--mouse-x', e.clientX + 'px');
-    document.body.style.setProperty('--mouse-y', e.clientY + 'px');
-});
