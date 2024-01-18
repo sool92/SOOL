@@ -3,34 +3,26 @@ body, html {
     margin: 0;
     font-family: Arial, sans-serif;
     overflow: hidden; /* Prevents scrollbar due to heart effect */
+    background: linear-gradient(to right, yellow, pink); /* Background gradient */
 }
 
-.container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    background: linear-gradient(to right, yellow, pink);
+/* Style for personal content */
+.content {
+    max-width: 800px;
+    margin: 0 auto;
     padding: 20px;
-    box-sizing: border-box;
-}
-
-.section {
-    width: calc(50% - 40px);
-    margin: 10px;
-    padding: 20px;
-    background-color: #fff;
-    border: none;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Adds shadow to the sections */
-    box-sizing: border-box;
+    background-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     text-align: left;
+    border-radius: 10px; /* Optional: adds rounded corners */
 }
 
-.section a {
-    text-decoration: none;
-    color: black;
-    display: block; /* Makes the link cover the whole section */
+.content h1, .content h2 {
+    color: #333;
+}
+
+.content p, .content ul {
+    color: #666;
 }
 
 /* Heart effect following the mouse */
@@ -63,9 +55,8 @@ body[data-heart="hide"]::before {
 
 /* Responsive layout for smaller screens */
 @media screen and (max-width: 600px) {
-    .section {
+    .content {
         width: calc(100% - 40px);
+        padding: 10px;
     }
 }
-
-
