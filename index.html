@@ -1,79 +1,18 @@
-
 <!DOCTYPE html>
 <html>
 <head>
-  <title>个人简介</title>
+    <title>个人网页</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 <body>
-  <h1>个人简介</h1>
-  <p>姓名：张三</p >
-  <p>年龄：20岁</p >
-  <p>性别：男</p >
-  <p>爱好：编程、阅读、音乐</p >
-  <p>简历：
-    <ul>
-      <li>2018年毕业于北京大学计算机科学专业</li>
-      <li>2018年加入阿里巴巴，担任软件工程师</li>
-      <li>2020年晋升为高级软件工程师</li>
-    </ul>
-  </p >
-  <p>联系方式：
-    <ul>
-      <li>电话：13800138000</li>
-      <li>邮箱：zhangsan@example.com</li>
-    </ul>
-  </p >
+    <div class="container">
+        <div class="section" id="section1"><a href="page1.html">板块1</a></div>
+        <div class="section" id="section2"><a href="page2.html">板块2</a></div>
+        <div class="section" id="section3"><a href="page3.html">板块3</a></div>
+        <div class="section" id="section4"><a href="page4.html">板块4</a></div>
+        <div class="section" id="section5"><a href="page5.html">板块5</a></div>
+        <div class="section" id="section6"><a href="page6.html">板块6</a></div>
+    </div>
 </body>
 </html>
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>排版要在中间。背景颜色黄粉渐变</title>
-  <style>
-    body {
-      background: linear-gradient(to right, #FFFF66, #FF99FF);
-      text-align: center;
-      font-family: Arial, sans-serif;
-    }
-  </style>
-</head>
-
-
-  <!DOCTYPE html>
-<html>
-<head>
-  <title>鼠标特效是小爱心</title>
-  <style>
-    body {
-      background: linear-gradient(to right, #FFFF66, #FF99FF);
-      text-align: center;
-      font-family: Arial, sans-serif;
-    }
-    #cursor {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      background: red;
-      z-index: 999;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-    }
-  </style>
-</head>
-<body>
-  <div id="cursor"></div>
-
-  <script>
-    const cursor = document.getElementById("cursor");
-
-    document.addEventListener("mousemove", (e) => {
-      cursor.style.top = e.pageY + "px";
-      cursor.style.left = e.pageX + "px";
-    });
-  </script>
-</body>
