@@ -25,6 +25,18 @@ body, html {
     color: #666;
 }
 
+/* New section style */
+.new-section {
+    margin: 20px auto;
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border: 1px solid #ddd;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px; /* 圆角边框 */
+    max-width: 800px;
+    text-align: left;
+}
+
 /* Heart effect following the mouse */
 body::before {
     content: '❤';
@@ -42,20 +54,9 @@ body:hover::before {
     transform: scale(1);
 }
 
-/* Javascript is required to update these properties */
-body[data-heart="show"]::before {
-    opacity: 1;
-    transform: scale(1);
-}
-
-body[data-heart="hide"]::before {
-    opacity: 0;
-    transform: scale(0);
-}
-
 /* Responsive layout for smaller screens */
 @media screen and (max-width: 600px) {
-    .content {
+    .content, .new-section {
         width: calc(100% - 40px);
         padding: 10px;
     }
