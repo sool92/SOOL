@@ -7,6 +7,8 @@ body, html {
 }
 
 
+
+
 .container {
     display: flex;
     flex-direction: column;
@@ -15,7 +17,10 @@ body, html {
     text-align: center;
     min-height: 100vh;
 }
-}
+
+
+
+
 .content, .new-section {
     max-width: 800px;
     margin: 15px;
@@ -24,6 +29,8 @@ body, html {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     border-radius: 10px;
 }
+
+
 
 /* ... 其余的CSS代码保持不变 ... */
 
