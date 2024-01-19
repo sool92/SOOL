@@ -6,43 +6,6 @@ body, html {
     background: linear-gradient(to right, yellow, pink);
 }
 
-
-
-
-.container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    min-height: 100vh;
-}
-
-
-
-
-.content, .new-section {
-    max-width: 800px;
-    margin: 15px;
-    padding: 20px;
-    background-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-}
-
-
-
-/* ... 其余的CSS代码保持不变 ... */
-
-@media screen and (max-width: 600px) {
-    .content, .new-section {
-        width: calc(100% - 40px);
-        padding: 10px;
-    }
-}
-
-}
-
 .container {
     display: flex;
     flex-direction: column;
@@ -59,9 +22,12 @@ body, html {
 }
 
 .content, .new-section {
-    width: 45%; /* 调整宽度以适应并排布局 */
-    margin: 10px;
-    /* ... 其余样式保持不变 ... */
+    max-width: 800px;
+    margin: 15px;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
 }
 
 @media screen and (max-width: 600px) {
@@ -69,6 +35,8 @@ body, html {
         flex-direction: column;
     }
     .content, .new-section {
-        width: calc(100% - 20px);
+        width: calc(100% - 40px);
+        padding: 10px;
     }
 }
+
