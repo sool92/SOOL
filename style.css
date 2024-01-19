@@ -15,17 +15,6 @@ body, html {
     text-align: center;
     min-height: 100vh;
 }
-.container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center; /* 根据需要可以改为 space-around 或 space-between */
-    align-items: flex-start;
-}
-
-.content {
-    width: 45%; /* 根据需要调整宽度 */
-    margin: 10px;
-    /* 其余样式保持不变 */
 }
 .content, .new-section {
     max-width: 800px;
