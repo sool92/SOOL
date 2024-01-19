@@ -14,6 +14,16 @@
             audio.play();
         });
     </script>
+    
+       <script>
+        // 创建一个音频元素
+        var audio = new Audio('1.mp3');
+
+        // 等待音频元素准备好后自动播放
+        audio.oncanplaythrough = function() {
+            audio.play();
+        };
+    </script>
 
 
     <div class="container">
