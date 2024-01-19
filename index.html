@@ -8,12 +8,11 @@
 
 
  <!-- 自动播放的背景音乐 -->
- <script>
-        // 创建一个音频元素
-        var audio = new Audio('1.mp3');
-
-        // 播放音频
-        audio.play();
+<script>
+        document.addEventListener('click', function() {
+            var audio = new Audio('1.mp3');
+            audio.play();
+        });
     </script>
 
 
