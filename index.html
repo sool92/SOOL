@@ -9,11 +9,15 @@
 
  <!-- 点击网页自动播放的背景音乐 -->
 <script>
-        document.addEventListener('click', function() {
-            var audio = new Audio('1.mp3');
-            audio.play();
-        });
-    </script>
+    function playAudio() {
+        var audio = new Audio('1.mp3');
+        audio.play();
+        document.removeEventListener('click', playAudio);
+    }
+
+    document.addEventListener('click', playAudio);
+</script>
+
     
 
 
