@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- 加载诊断条：正常时一直隐藏，只有资源加载失败才出现（逻辑在 script.js） -->
+  <div class="diag" id="diag" role="status" aria-live="polite" hidden></div>
+
   <main class="page">
     <!-- 顶部标题条 -->
     <header class="card header-card">
@@ -99,8 +102,10 @@
   </main>
 
   <!-- 真实音频播放器（隐藏，由 JS 控制） -->
+  <!-- preload：metadata 首屏只取时长，不抢带宽；点了播放会自动去取音频 -->
   <audio id="audio" preload="metadata"></audio>
 
-  <script src="script.js"></script>
+  <!-- defer：保证 DOM 就绪后才跑，避免脚本先于元素执行 -->
+  <script src="script.js" defer></script>
 </body>
 </html>

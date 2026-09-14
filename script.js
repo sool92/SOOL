@@ -1,8 +1,8 @@
 /* =========================================================
    个人主页 · 交互脚本
    ---------------------------------------------------------
-   音乐播放器：固定 3 首，改歌只需修改下面的 SONGS 数组。
-   音频文件放在 ./music/ 文件夹里。
+   音乐播放器：默认 3 首，改歌只需修改下面的 SONGS 数组。
+   不用配置、不用构建，直接上传 GitHub Pages 即可。
    ========================================================= */
 
 // ===== 1. 歌曲配置（固定 3 首，改这里就行）=====
@@ -11,27 +11,81 @@
 // 歌名 / 歌手随便写，只影响界面显示，不影响播放。
 // 换歌：把新文件放进 ./music/，然后改下面 3 行的 file 即可。
 const SONGS = [
-  { name: "够爱（DJ版）",     artist: "阿泽",   file: "阿泽 - 够爱（DJ版）.mp3" },
-  { name: "偏爱（咚鼓版）",   artist: "DJ阿轩", file: "DJ阿轩 - 偏爱 (咚鼓版).mp3" },
-  { name: "嘉宾（DJ舒心版）", artist: "DJ舒心", file: "DJ舒心 - 嘉宾（DJ舒心版）.mp3" },
+  { name: "够爱（DJ版）",     artist: "阿泽",   file: "azhe-gou-ai.mp3" },
+  { name: "偏爱（咚鼓版）",   artist: "DJ阿轩", file: "djaxuan-pian-ai.mp3" },
+  { name: "嘉宾（DJ舒心版）", artist: "DJ舒心", file: "djshuxin-jia-bin.mp3" },
 ];
 
 // ===== 2. 主题：自动跟随系统 + 记住手动选择 =====
 (function () {
   const root = document.documentElement;
-  const saved = localStorage.getItem("theme");
-  if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
+  try {
+    const saved = localStorage.getItem("theme");
+    if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
+  } catch (e) { /* 隐私模式忽略 */ }
 
   // 手动循环切换：自动 -> 浅色 -> 深色 -> 自动
   window.cycleTheme = function () {
     const cur = root.getAttribute("data-theme");
     const next = cur === "dark" ? "light" : cur === "light" ? "" : "dark";
-    if (next) { root.setAttribute("data-theme", next); localStorage.setItem("theme", next); }
-    else { root.removeAttribute("data-theme"); localStorage.removeItem("theme"); }
+    if (next) {
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("theme", next); } catch (e) {}
+    } else {
+      root.removeAttribute("data-theme");
+      try { localStorage.removeItem("theme"); } catch (e) {}
+    }
   };
 })();
 
-// ===== 3. 音乐播放器 =====
+// ===== 3. 加载诊断：资源加载失败时在页面顶部给出可读提示 =====
+// 手机上不方便开控制台，所以把关键错误直接显示出来。
+(function () {
+  const diag = document.getElementById("diag");
+  if (!diag) return;
+
+  const items = [];
+  function report(msg) {
+    if (items.indexOf(msg) !== -1) return;
+    items.push(msg);
+    diag.innerHTML = items
+      .map((t) => `<div class="diag-line">${t}</div>`)
+      .join("");
+    diag.hidden = false;
+  }
+  window.__diagReport = report;
+
+  // 检测当前是否运行在 file:// 下 —— 这种协议下浏览器会拦截音频加载
+  if (location.protocol === "file:") {
+    report("⚠️ 当前是 file:// 直接打开，浏览器会拦截音频。请用本地服务器或部署到 GitHub Pages 访问。");
+  }
+
+  // 音频 / 图片加载失败都会触发 error（捕获阶段才能拿到）
+  window.addEventListener("error", (e) => {
+    const el = e.target;
+    if (!el || !el.tagName) return;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "audio" || tag === "img") {
+      const src = el.currentSrc || el.getAttribute("src") || "(空)";
+      report(`❌ ${tag === "audio" ? "音频" : "图片"}加载失败：<code>${decodeURIComponent(src)}</code>`);
+    }
+  }, true);
+
+  // 支持 Range 的服务器才适合流式播放音频，顺便探一下
+  window.addEventListener("load", () => {
+    if (location.protocol === "file:") return;
+    const probeUrl = "avatar.jpg";
+    fetch(probeUrl, { method: "HEAD" })
+      .then((r) => {
+        if (r.headers.get("accept-ranges") === "none") {
+          report("⚠️ 当前服务器不支持分片传输（Range），音频可能加载很慢或无法拖动进度。");
+        }
+      })
+      .catch(() => {});
+  });
+})();
+
+// ===== 4. 音乐播放器 =====
 (function () {
   const audio      = document.getElementById("audio");
   const playlist   = document.getElementById("playlist");
@@ -49,6 +103,13 @@ const SONGS = [
   const tCur       = document.getElementById("tCur");
   const tDur       = document.getElementById("tDur");
   const card       = document.querySelector(".music-card");
+
+  // 这些元素缺一个就说明 HTML 被改坏了，直接报出来，免得后面莫名其妙卡住
+  const required = { audio, playlist, playBtn, prevBtn, nextBtn, loopBtn, shuffleBtn,
+                     muteBtn, vol, nowName, nowArtist, cover, seek, tCur, tDur, card };
+  for (const k of Object.keys(required)) {
+    if (!required[k]) { console.error("[player] 缺少 DOM 元素：", k); return; }
+  }
 
   const SITE_TITLE = document.title;   // 暂停时把标签页标题还原成站点名
 
@@ -85,6 +146,12 @@ const SONGS = [
     ? s.src.split("/").map(esc).join("/")     // 文件不在 music/ 时用 src 写完整相对路径
     : "music/" + esc(s.file);
 
+  // 错误提示：直接写在界面上，手机上没控制台也能看到原因
+  function fail(msg) {
+    nowName.textContent = "播放失败";
+    nowArtist.textContent = msg;
+  }
+
   // ---- 列表渲染 ----
   function renderPlaylist() {
     playlist.innerHTML = SONGS.map((s, i) => `
@@ -99,7 +166,6 @@ const SONGS = [
   }
 
   // 高亮当前曲目。booted 为 false 时不滚动页面，免得一进站就跳走。
-  // （现在只有 3 首，用不上滚动；保留是为了以后加歌也不会看不到。）
   let booted = false;
   function highlight(i) {
     playlist.querySelectorAll(".track").forEach((el, idx) => {
@@ -137,7 +203,12 @@ const SONGS = [
   function load(i, autoplay) {
     current = (i + SONGS.length) % SONGS.length;
     const s = SONGS[current];
-    audio.src = srcOf(s);
+    const url = srcOf(s);
+
+    // 同一个 src 反复赋值，有些浏览器不会重新加载，先清空更稳
+    if (audio.getAttribute("src") === url) audio.removeAttribute("src");
+
+    audio.src = url;
     nowName.textContent = s.name;
     nowArtist.textContent = s.artist;
     cover.textContent = "♪";
@@ -161,22 +232,28 @@ const SONGS = [
   }
 
   function play() {
-    audio.play().then(() => {
+    card.classList.add("loading");      // 先转圈，慢网下不至于以为点了没反应
+    const p = audio.play();
+    if (!p || !p.then) return;
+    p.then(() => {
+      card.classList.remove("loading");
       card.classList.add("playing");
       playBtn.setAttribute("aria-label", "暂停");
       cover.classList.add("spin");
       document.title = `${SONGS[current].name} - ${SONGS[current].artist}`;
       if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
     }).catch((err) => {
+      card.classList.remove("loading");
       // 常见：文件不存在 / 浏览器自动播放限制
-      nowArtist.textContent = "播放失败：" + (SONGS[current].file || "路径错误");
       console.warn("播放失败：", srcOf(SONGS[current]), err);
+      fail("无法播放：" + (SONGS[current].file || "路径错误"));
     });
   }
 
   function pause() {
     audio.pause();
     card.classList.remove("playing");
+    card.classList.remove("loading");
     playBtn.setAttribute("aria-label", "播放");
     cover.classList.remove("spin");
     document.title = SITE_TITLE;
@@ -273,10 +350,19 @@ const SONGS = [
   audio.addEventListener("waiting", () => card.classList.add("loading"));
   audio.addEventListener("playing", () => card.classList.remove("loading"));
   audio.addEventListener("canplay", () => card.classList.remove("loading"));
+  audio.addEventListener("canplaythrough", () => card.classList.remove("loading"));
+  audio.addEventListener("stalled", () => card.classList.remove("loading"));
 
   audio.addEventListener("error", () => {
     card.classList.remove("loading");
-    nowArtist.textContent = "音频加载失败：" + (SONGS[current].file || "路径错误");
+    const code = audio.error && audio.error.code;
+    // 1=中止 2=网络 3=解码 4=格式不支持
+    const why = code === 4 ? "格式不支持或文件损坏"
+              : code === 3 ? "音频解码失败"
+              : code === 2 ? "网络中断，文件可能没上传完整"
+              : "文件不存在（路径或文件名对不上）";
+    fail("加载失败：" + why);
+    console.warn("音频错误 code =", code, "URL =", audio.currentSrc || audio.src, audio.error);
     pause();
   });
 
@@ -307,24 +393,57 @@ const SONGS = [
     setHandler("nexttrack", () => next(false));
   }
 
-  // 后台逐个读取每首歌的时长，写回列表（不改变当前播放状态）
+  // ---- 后台逐个读取每首歌的时长，写回列表（不改变当前播放状态）----
+  //
+  // 这段是最容易把页面拖住的地方，做了三重保险：
+  //   1. 同一时刻只加载一首，读完再读下一首，不并发抢带宽
+  //   2. 每次探测都带超时，读不到就跳过，不会永远停在第一首
+  //   3. 整个流程有总时限，超时直接收工，不影响页面其他功能
   function scanDurations() {
+    const TIMEOUT  = 12000;               // 单首超时
+    const DEADLINE = Date.now() + 90000;  // 整体上限
+    const tracks   = playlist.querySelectorAll(".track");
+    const probe    = new Audio();
+    probe.preload  = "metadata";
+    probe.muted    = true;
+
     let i = 0;
-    const probe = new Audio();
-    probe.preload = "metadata";
-    const tracks = playlist.querySelectorAll(".track");
-    const step = () => {
-      if (i >= SONGS.length) { probe.src = ""; return; }
+    let timer = null;
+    let done = false;
+
+    function finish() {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      probe.onloadedmetadata = null;
+      probe.onerror = null;
+      probe.removeAttribute("src");
+      try { probe.load(); } catch (e) {}
+    }
+
+    function step() {
+      if (done) return;
+      if (i >= SONGS.length || Date.now() > DEADLINE) { finish(); return; }
+
       const idx = i++;
-      probe.src = srcOf(SONGS[idx]);
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        console.warn("[player] 读取时长超时，跳过：", SONGS[idx].file);
+        step();
+      }, TIMEOUT);
+
       probe.onloadedmetadata = () => {
-        if (isFinite(probe.duration) && tracks[idx]) {
+        if (isFinite(probe.duration) && probe.duration > 0 && tracks[idx]) {
           tracks[idx].querySelector(".dur").textContent = fmt(probe.duration);
         }
         step();
       };
-      probe.onerror = step;   // 某一首读不到就跳过，不影响其他
-    };
+      probe.onerror = () => step();   // 某一首读不到就跳过，不影响其他
+
+      probe.src = srcOf(SONGS[idx]);
+      try { probe.load(); } catch (e) {}
+    }
+
     step();
   }
 
@@ -336,5 +455,8 @@ const SONGS = [
   renderPlaylist();
   load(current, false);
   booted = true;
-  scanDurations();
+
+  // 等页面本身加载完再扫描时长，避免和首屏资源抢带宽
+  if (document.readyState === "complete") scanDurations();
+  else window.addEventListener("load", scanDurations);
 })();
