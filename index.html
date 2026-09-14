@@ -105,7 +105,11 @@
   <!-- preload：metadata 首屏只取时长，不抢带宽；点了播放会自动去取音频 -->
   <audio id="audio" preload="metadata"></audio>
 
+  <!-- 下雨效果画布（纯装饰，不挡点击；逻辑在 rain.js） -->
+  <canvas id="rain" aria-hidden="true"></canvas>
+
   <!-- defer：保证 DOM 就绪后才跑，避免脚本先于元素执行 -->
   <script src="script.js" defer></script>
+  <script src="rain.js" defer></script>
 </body>
 </html>
