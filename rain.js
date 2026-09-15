@@ -120,15 +120,15 @@
     return null;
   }
 
-  // ---- 卡片状态：每张卡片记录"有多湿"和"上沿积了多少水" ----
-  const cards = new Map();   // el -> { wet: Map, edge: number }
+  // ---- 卡片状态：每张卡片记录"有多湿" ----
+  const cards = new Map();   // el -> { wet: Map }
 
   // 卡片离开视野时清掉脏状态，别把水渍算到滚回来的卡片上
   const io = typeof IntersectionObserver === "function"
     ? new IntersectionObserver((es) => {
         for (const e of es) {
           const st = cards.get(e.target);
-          if (st && !e.isIntersecting) { st.wet.clear(); st.edge = 0; }
+          if (st && !e.isIntersecting) st.wet.clear();
         }
       })
     : null;
@@ -136,7 +136,7 @@
   function stateOf(el) {
     let st = cards.get(el);
     if (!st) {
-      st = { wet: new Map(), edge: 0 };
+      st = { wet: new Map() };
       cards.set(el, st);
       if (io) io.observe(el);
     }
@@ -233,18 +233,22 @@
     return { kind: "pending", el, st, lx, ly, r: rand(0.55, 1.1), life, alive: 1 };
   }
 
-  // 卡片上沿被打中：沿上沿朝溅开的方向铺一层水膜，随后各自往下淌
+  // 卡片上沿被打中：水沿上沿朝溅开的方向散开，随后各自往下淌。
+  // 注意：**不要**沿着上沿横向刷一连串水渍格 —— 那些格子会连成一整条
+  // 贴着卡片顶边的横带（手机滚动时看得出移位）。改成散几滴"待流水珠"，
+  // 让水以"一颗颗往下淌"的方式表现，而不是画一条边。
   function spreadOnTop(el, st, r, hitLx, power) {
-    const dir = hitLx < r.width / 2 ? -1 : 1;   // 朝较近的那侧铺开
+    const dir = hitLx < r.width / 2 ? -1 : 1;   // 朝较近的那侧散开
     const n = 2 + ((power * 3) | 0);
     for (let i = 0; i < n; i++) {
       if (drops.length >= MAX_DROPS) break;
-      const lx = clamp(hitLx + dir * Math.random() * r.width * 0.28, 3, r.width - 3);
-      drops.push(newPendingDrop(el, st, lx, rand(0.5, 3.5), 0.35 + Math.random() * 0.4));
+      const lx = clamp(hitLx + dir * (i + 1) * rand(9, 22), 3, r.width - 3);
+      // 纵向起点错开一点，避免几颗水珠横着排成一条线
+      drops.push(newPendingDrop(el, st, lx, rand(1.5, 8), 0.35 + Math.random() * 0.4));
     }
-    // 沿上沿补几格水渍，让"被打湿"看得出来
-    for (let i = 0; i < 5; i++) {
-      wetAdd(st, clamp(hitLx + dir * i * WET_CELL * 1.4, 0, r.width), rand(0, 3), 0.30);
+    // 落点附近留一点水渍（只围绕落点，不铺满整个上沿）
+    for (let i = 0; i < 3; i++) {
+      wetAdd(st, clamp(hitLx + dir * i * WET_CELL, 0, r.width), rand(1, 7), 0.28);
     }
   }
 
@@ -299,13 +303,12 @@
   }
 
   // 卡片被打中后统一在这里处理（天空雨丝、专属雨都用它）
-  function onCardHit(res, power, edgeBoost) {
+  function onCardHit(res, power) {
     const { hit, r, el, st } = res;
     if (hit.top) {
       // 打中上沿：溅一大簇，水沿上沿向两边铺开，再从边缘往下淌
       newSplash(hit.x, r.top, 4 + ((power * 3) | 0), 1.35, power);
       spreadOnTop(el, st, r, hit.x - r.left, power);
-      st.edge = Math.max(st.edge, edgeBoost);
     } else {
       // 打中正面：溅开 + 在落点凝一颗水珠往下流（打哪流哪）
       newSplash(hit.x, hit.y, 3 + ((power * 3) | 0), 1.15, power);
@@ -357,7 +360,7 @@
       // 这一帧的移动轨迹有没有打中卡片？打中就照着落点做反应
       const res = hitCards(cardList, x0, y0, s.x, s.y);
       if (res) {
-        onCardHit(res, clamp(s.len / 22, 0.35, 1), 1);
+        onCardHit(res, clamp(s.len / 22, 0.35, 1));
         Object.assign(s, newStreak(true));   // 雨滴"用掉"了，换个新的
         continue;
       }
@@ -409,7 +412,7 @@
       if (hit) {
         const power = clamp(cr.len / 16, 0.4, 1);
         wetAdd(cr.card.st, hit.ix - r.left, hit.iy - r.top, 0.65);
-        onCardHit({ hit, r, el: cr.card.el, st: cr.card.st }, power, 1);
+        onCardHit({ hit, r, el: cr.card.el, st: cr.card.st }, power);
         cardRain.splice(i, 1);
         continue;
       }
@@ -455,6 +458,10 @@
           if (!arr) { arr = []; rows.set(gy, arr); }
           arr.push(gx);
         }
+        // 单条合并 run 最多跨多少格。设上限是为了防止水渍沿某一行越积越多、
+        // 最后连成一整条横贯卡片的带子 —— 那种横带在手机滚动时看着像"移位"。
+        // 拆成小段后视觉上完全看不出接缝（水渍本身是很淡的软斑）。
+        const MAX_RUN = 6;
         for (const [gy, xs] of rows) {
           xs.sort((a, b) => a - b);
           let runStart = xs[0], prev = xs[0], sum = 0, n = 0;
@@ -470,19 +477,20 @@
           };
           for (const gx of xs) {
             const v = st.wet.get(wetKey(gx, gy));
-            if (gx === prev + 1) { prev = gx; sum += v; n++; }
-            else { flush(); runStart = prev = gx; sum = v; n = 1; }
+            // 连续且没超过单段上限 → 继续并进这一段
+            if (gx === prev + 1 && (gx - runStart) < MAX_RUN) {
+              prev = gx; sum += v; n++;
+            } else {
+              flush(); runStart = prev = gx; sum = v; n = 1;
+            }
           }
           flush();
         }
       }
-      st.edge = Math.max(0, st.edge - 0.006);       // 上沿积水慢慢渗掉
-      // 上沿积水：卡片顶端一条淡淡的水膜，表示"上沿被打湿了"
-      if (st.edge > 0.03) {
-        const rad = Math.min(R, r.width / 2, r.height / 2);
-        ctx.fillStyle = `rgba(${edge},${st.edge * 0.16})`;
-        ctx.fillRect(r.left + rad * 0.5, r.top, r.width - rad, 1.5 + st.edge * 3);
-      }
+      // 注意：这里**不要**再给卡片顶端画一条"积水面"。
+      // 那是一条贴着卡片上沿的横向细线，手机端滚动时画布是 fixed 的，
+      // 合成器与 canvas 不一定同帧绘制，滚动中会看到这条线明显"移位/抖动"。
+      // 卡片是否被打湿，靠水渍 + 水珠流动表达已经够了。
     }
 
     // ===== 3a. 滴落到卡片下方、还没落地的小水点 =====
