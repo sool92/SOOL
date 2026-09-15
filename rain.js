@@ -1,16 +1,19 @@
 /* =========================================================
    下雨效果 · Canvas
    ---------------------------------------------------------
-   真实感来自五层叠加：
+   真实感来自四层叠加：
 
    1. 天空雨丝
       远层细而慢、近层粗而快，带横向风偏；
       落到页面底部会溅起一小簇水花。
+      **打中卡片后不停下、也不消失，继续往下落** —— 所以雨是整屏均匀的，
+      每一块模块都会有自己的雨从空中落到它身上（详见下面"注意"）。
 
-   2. 卡片专属雨（key point）
-      天空雨丝是"满屏乱飘"的，落到页面下半部分的卡片时往往已经用掉了，
-      结果就是只有最顶上那张卡片被打到。所以这里给**每张可见卡片**
-      单独配一小股正上方的雨，保证每张卡片模块都有雨打上去。
+   2. 卡片专属雨
+      天空雨丝虽然满屏都在下，但落到某一小块模块上的密度是随机的、
+      可能一段时间一滴都没有。所以每张可见模块再单独配一小股正上方的雨
+      （卡片越宽给得越多），从卡片上方很高处——常常还在屏幕外——垂直落下。
+      这样"雨从空中落到这块模块上"是能明确看见的。
 
    3. 雨滴打在卡片上（不再涂"水渍"色块）
       一滴雨打中卡片，就在那个位置溅水花，并让水从那儿开始流。
@@ -32,6 +35,14 @@
 
    性能：全程单 canvas，无外部依赖；页面切到后台时浏览器
    自动暂停 requestAnimationFrame。纯静态，直接传 GitHub Pages 即可。
+
+   ⚠️ 两条不能改回去的注意事项（都踩过）：
+   · 天空雨丝**不要**在打中卡片时回收重生。以前写的是
+     `Object.assign(s, newStreak(true))`，雨滴一碰到最上面那张卡片就消失、
+     重生到屏幕顶部，于是整个页面只有最顶上那块模块有雨。
+   · 每根雨丝/每滴雨**不要**各画各的，要按桶攒成一条路径一次描边
+     （详见 1c 和卡片专属雨那段）。手机上每帧的 stroke 次数直接决定流畅度：
+     分桶后本效果只要约 360 次/帧，不分组则要 1085 次/帧。
    ========================================================= */
 (function () {
   "use strict";
@@ -195,23 +206,34 @@
   // ---- 天空雨丝 ----
   const streaks = [];
   const STREAK_N = clamp(Math.round(window.innerWidth / 9), 70, 170);
+  // 雨丝按"层 + 亮度档"分 4 桶。整桶攒成一条路径、一次 stroke 画完 ——
+  // 以前每根雨丝要 2 次 stroke（本体 + 亮头），70 根就是 140 次；
+  // 分桶后整屏只要 8 次。这不是省小钱：手机上每帧的 stroke 次数直接决定流畅度。
+  const SKY_LVL = [
+    { w: 1.1, a: 0.22 },   // 远层 · 暗
+    { w: 1.1, a: 0.29 },   // 远层 · 亮
+    { w: 1.6, a: 0.41 },   // 近层 · 暗
+    { w: 1.6, a: 0.49 },   // 近层 · 亮
+  ];
   function newStreak(fromTop) {
     const near = Math.random() < 0.45;   // 近景层更粗、更快、更亮
+    const aLo = near ? 0.34 : 0.18, aHi = near ? 0.52 : 0.30;
+    const a = rand(aLo, aHi);
     return {
       x: rand(-80, W + 40),
       y: fromTop ? rand(-H * 0.5, -10) : rand(-H, H),
       len: near ? rand(16, 30) : rand(9, 18),
       vy: near ? rand(14, 20) : rand(8, 12),
       vx: rand(-0.2, 0.2),
-      w: near ? 1.6 : 1.1,
-      a: near ? rand(0.34, 0.52) : rand(0.18, 0.30),
+      lvl: (near ? 2 : 0) + (a > (aLo + aHi) / 2 ? 1 : 0),
+      hitEl: null,          // 这一趟已经碰过的卡片（用来避免同一张卡重复触发）
     };
   }
   for (let i = 0; i < STREAK_N; i++) streaks.push(newStreak(false));
 
   // ---- 水珠：slide = 正在卡片正面往下流；pending = 刚落下的水膜；falling = 已滴落 ----
   const drops = [];
-  const MAX_DROPS = 46;
+  const MAX_DROPS = 54;
   let DROP_SEQ = 0;
 
   function newSlideDrop(el, st, lx, ly, power) {
@@ -219,8 +241,8 @@
     return {
       kind: "slide", el, st,
       lx, ly,
-      r: clamp(0.65 + power * 0.55, 0.75, 2.0),
-      len: 2.5 + power * 4,
+      r: clamp(0.42 + power * 0.36, 0.50, 1.30),
+      len: 2.0 + power * 3,
       vy: 0.20 + power * 0.42,
       phase: Math.random() * Math.PI * 2,
       wob: 0.10 + Math.random() * 0.20,
@@ -231,7 +253,7 @@
   }
 
   function newPendingDrop(el, st, lx, ly, life) {
-    return { kind: "pending", el, st, lx, ly, r: rand(0.55, 1.1), life, alive: 1 };
+    return { kind: "pending", el, st, lx, ly, r: rand(0.38, 0.78), life, alive: 1 };
   }
 
   // 卡片上沿被打中：水沿上沿朝溅开的方向散开，随后各自往下淌。
@@ -255,7 +277,7 @@
 
   // ---- 水花：受重力的细水点 ----
   const splashes = [];
-  const SPLASH_MAX = 90;         // 总量封顶，低端机 / 手机上也扛得住
+  const SPLASH_MAX = 100;        // 总量封顶，低端机 / 手机上也扛得住
   function newSplash(x, y, n, spread, power) {
     for (let i = 0; i < n && splashes.length < SPLASH_MAX; i++) {
       const dir = Math.random() < 0.5 ? -1 : 1;
@@ -263,7 +285,7 @@
         x, y,
         vx: dir * rand(0.3, 1.6) * spread,
         vy: rand(-2.9, -0.7) * (0.6 + power),
-        r: rand(0.5, 1.3) * (0.8 + power * 0.5),
+        r: rand(0.35, 0.9) * (0.7 + power * 0.4),
         life: 1,
         decay: rand(0.075, 0.13),   // 水花很短命，眨眼就没了
       });
@@ -277,12 +299,13 @@
 
   // ---- 卡片上方的"局部雨"----
   // 天空里的雨丝会到处飘，但落到页面下半部分的卡片上时，往往已经"用掉"了。
-  // 所以每张可见卡片自己再维护一小股正上方的雨，保证**每张卡片**都有雨打在上面，
+  // 所以每张可见卡片自己再维护一股正上方的雨，保证**每张卡片**都有雨打在上面，
   // 而不是只有最顶上那张。这就是"雨滴打到所有卡片模块"的关键。
   const cardRain = [];   // { card, x, y, vy, len }
-  // 每张卡片允许的"专属雨滴"数量：卡片越宽、给得越多
+  // 每张卡片允许的"专属雨滴"数量：要够密，才看得出"雨是从空中落到这块模块上的"。
+  // 卡片越宽给得越多。
   function quotaFor(r) {
-    return clamp(Math.round(r.width / 240) + 1, 1, 4);
+    return clamp(Math.round(r.width / 110) + 2, 2, 7);
   }
   function countCardRain(card) {
     let n = 0;
@@ -296,7 +319,9 @@
       cardRain.push({
         card: c,
         x: r.left + rand(4, Math.max(5, r.width - 4)),
-        y: r.top - rand(40, 190),      // 从卡片上方一段距离落下
+        // 从卡片上方**很高**的地方落下（常常还在屏幕外），
+        // 这样看着是"雨从空中落到这块模块上"，而不是贴着卡片凭空冒出来
+        y: r.top - rand(70, Math.min(H * 0.75, 430)),
         vy: rand(6, 11),
         len: rand(7, 14),
       });
@@ -351,19 +376,26 @@
     }
 
     // ===== 1. 天空雨丝 =====
+    // 先跑物理 + 命中判定，把要画的线段按桶攒进 skyDraw，
+    // 循环结束后整桶一次描边（见下面 1c）。每根雨丝 8 个数字：
+    // 本体 (x0,y0,x1,y1) + 亮头 (x0,y0,x1,y1)
     ctx.lineCap = "round";
+    const skyDraw = [[], [], [], []];
     for (const s of streaks) {
       const x0 = s.x, y0 = s.y - s.len;
       s.vx = clamp(s.vx * 0.94 + 0.012, -0.6, 1.1);   // 风慢慢起来，封顶
       s.x += s.vx;
       s.y += s.vy;
 
-      // 这一帧的移动轨迹有没有打中卡片？打中就照着落点做反应
+      // 这一帧的移动轨迹有没有打中卡片？打中就照着落点做反应。
+      // 关键：打中之后**继续往下落**，不要在这里把雨丝回收。
+      // 以前这里是 Object.assign(s, newStreak(true))，等于一滴雨一碰到最上面那张卡片
+      // 就消失并重生到屏幕顶部 —— 结果整个页面只有最顶那个模块有雨，
+      // 下面的模块只剩"流水"，看不到雨从空中落到它们身上。
       const res = hitCards(cardList, x0, y0, s.x, s.y);
-      if (res) {
+      if (res && s.hitEl !== res.el) {
+        s.hitEl = res.el;                              // 同一张卡只触发一次
         onCardHit(res, clamp(s.len / 22, 0.35, 1));
-        Object.assign(s, newStreak(true));   // 雨滴"用掉"了，换个新的
-        continue;
       }
 
       // 落到页面底部：溅水花、重生
@@ -373,19 +405,34 @@
         continue;
       }
 
-      // 雨丝本体：一条带渐隐尾的短线
-      ctx.strokeStyle = `rgba(${sky},${s.a})`;
-      ctx.lineWidth = s.w;
+      skyDraw[s.lvl].push(
+        s.x - s.vx * (s.len / s.vy) - 0.5, s.y - s.len, s.x, s.y,
+        s.x - s.vx * 1.2, s.y - s.len * 0.35, s.x, s.y
+      );
+    }
+
+    // ===== 1c. 天空雨丝：分桶成路径，一次画完 =====
+    for (let lvl = 0; lvl < 4; lvl++) {
+      const arr = skyDraw[lvl];
+      if (!arr.length) continue;
+      const meta = SKY_LVL[lvl];
+      // 本体
+      ctx.strokeStyle = `rgba(${sky},${meta.a})`;
+      ctx.lineWidth = meta.w;
       ctx.beginPath();
-      ctx.moveTo(s.x - s.vx * (s.len / s.vy) - 0.5, s.y - s.len);
-      ctx.lineTo(s.x, s.y);
+      for (let i = 0; i < arr.length; i += 8) {
+        ctx.moveTo(arr[i], arr[i + 1]);
+        ctx.lineTo(arr[i + 2], arr[i + 3]);
+      }
       ctx.stroke();
       // 亮头：更短更亮的一小段，模拟反光
-      ctx.strokeStyle = `rgba(${sky},${s.a * 0.9})`;
-      ctx.lineWidth = s.w * 0.7;
+      ctx.strokeStyle = `rgba(${sky},${meta.a * 0.9})`;
+      ctx.lineWidth = meta.w * 0.7;
       ctx.beginPath();
-      ctx.moveTo(s.x - s.vx * 1.2, s.y - s.len * 0.35);
-      ctx.lineTo(s.x, s.y);
+      for (let i = 0; i < arr.length; i += 8) {
+        ctx.moveTo(arr[i + 4], arr[i + 5]);
+        ctx.lineTo(arr[i + 6], arr[i + 7]);
+      }
       ctx.stroke();
     }
 
@@ -394,13 +441,15 @@
     for (const c of cardList) {
       const have = countCardRain(c);
       const q = quotaFor(c.r);
-      if (have < q && cardRain.length < 60) seedCardRain(c, q - have);
+      if (have < q && cardRain.length < 120) seedCardRain(c, q - have);
     }
     // 卡片滚出视野就当它的雨掉没了
     for (let i = cardRain.length - 1; i >= 0; i--) {
       const r = cardRain[i].card.r;
       if (r.bottom < -30 || r.top > H + 30) cardRain.splice(i, 1);
     }
+    // 同样攒进一条路径一次画完（每滴 4 个数字：x, y-top, x, y）
+    const crDraw = [];
     for (let i = cardRain.length - 1; i >= 0; i--) {
       const cr = cardRain[i];
       const r = cr.card.r;
@@ -422,18 +471,16 @@
         cardRain.splice(i, 1);
         continue;
       }
-      // 画这滴雨：带一点渐隐尾
-      ctx.strokeStyle = `rgba(${sky},0.30)`;
+      crDraw.push(cr.x, cr.y - cr.len, cr.x, cr.y);
+    }
+    if (crDraw.length) {
+      ctx.strokeStyle = `rgba(${sky},0.32)`;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.moveTo(cr.x, cr.y - cr.len);
-      ctx.lineTo(cr.x, cr.y);
-      ctx.stroke();
-      ctx.strokeStyle = `rgba(${sky},0.34)`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(cr.x, cr.y - cr.len * 0.3);
-      ctx.lineTo(cr.x, cr.y);
+      for (let i = 0; i < crDraw.length; i += 4) {
+        ctx.moveTo(crDraw[i], crDraw[i + 1]);
+        ctx.lineTo(crDraw[i + 2], crDraw[i + 3]);
+      }
       ctx.stroke();
     }
 
@@ -505,7 +552,7 @@
         ctx.fill();
         // 攒够水了就开流
         if (Math.random() < 0.05) {
-          drops[i] = newSlideDrop(el, d.st, d.lx, d.ly, clamp(d.r / 2.2, 0.3, 0.9));
+          drops[i] = newSlideDrop(el, d.st, d.lx, d.ly, clamp(d.r / 1.5, 0.25, 0.75));
         }
         continue;
       }
@@ -551,8 +598,8 @@
       d.lx = clamp(d.lx, 0.5, r.width - 0.5);
 
       // 水珠会被拉长（速度越快越细长），也会长大一点，都有上限
-      d.r = clamp(d.r + moved * 0.004, 0.55, 2.2);
-      d.len = clamp(d.len + moved * 0.055, 2.5, 9);
+      d.r = clamp(d.r + moved * 0.003, 0.40, 1.45);
+      d.len = clamp(d.len + moved * 0.045, 2.0, 7);
 
       const x = r.left + d.lx;
       const y = r.top + d.ly;
@@ -565,7 +612,7 @@
       for (let k = 0; k < segs; k++) {
         const f0 = k / segs, f1 = (k + 1) / segs;
         ctx.strokeStyle = `rgba(${edge},${(0.06 + f1 * 0.16) * d.alive})`;
-        ctx.lineWidth = 0.4 + f1 * 1.1;
+        ctx.lineWidth = 0.3 + f1 * 0.72;
         ctx.beginPath();
         ctx.moveTo(x, y - trail * (1 - f0));
         ctx.lineTo(x, y - trail * (1 - f1));
@@ -590,15 +637,10 @@
       // 高光点：让水珠有体积感（偏左上）
       ctx.fillStyle = `rgba(255,255,255,${0.85 * d.alive})`;
       ctx.beginPath();
-      ctx.arc(x - rx * 0.34, y - ry * 0.42, Math.max(0.28, d.r * 0.26), 0, Math.PI * 2);
-      ctx.fill();
-      // 底部一点点暗边，更像水的折射
-      ctx.fillStyle = `rgba(${sky},${0.28 * d.alive})`;
-      ctx.beginPath();
-      ctx.arc(x + rx * 0.22, y + ry * 0.42, Math.max(0.24, d.r * 0.2), 0, Math.PI * 2);
+      ctx.arc(x - rx * 0.34, y - ry * 0.42, Math.max(0.22, d.r * 0.24), 0, Math.PI * 2);
       ctx.fill();
       // 水珠底部若积了一点水，画一个小小的下垂鼓起（"要滴不滴"的样子）
-      if (d.vy > 1.5 && d.r > 1.0) {
+      if (d.vy > 1.5 && d.r > 0.75) {
         ctx.fillStyle = `rgba(${edge},${0.34 * d.alive})`;
         ctx.beginPath();
         ctx.ellipse(x, y + ry * 0.95, rx * 0.6, rx * 0.9, 0, 0, Math.PI * 2);
@@ -606,7 +648,7 @@
       }
 
       // 滑得快时，会在身后"甩"下更小的水珠（真实玻璃上的水就是这样一串串的）
-      if (d.vy > 1.4 && d.r > 1.15 && Math.random() < 0.035 && drops.length < MAX_DROPS) {
+      if (d.vy > 1.4 && d.r > 0.85 && Math.random() < 0.04 && drops.length < MAX_DROPS) {
         drops.push({
           kind: "slide", el, st: d.st,
           lx: clamp(d.lx + rand(-1.2, 1.2), 0.5, r.width - 0.5),
