@@ -13,12 +13,11 @@ person-site/
 ├── index.html          页面结构
 ├── styles.css          样式（含白天/夜晚两套配色）
 ├── script.js           交互逻辑（播放器 + 主题跟随 + 加载诊断）
-├── check.html          部署自检页（打开就告诉你哪个资源没加载成功）
+├── rain.js             下雨效果（画在 #rain 画布上，独立于交互逻辑）
 ├── avatar.jpg          头像图片
 ├── qr.png              二维码图片
+├── CNAME               自定义域名（blog.sool.top），没有自定义域名就删掉
 ├── .nojekyll           让 GitHub Pages 跳过 Jekyll 处理，不要删
-├── tools/
-│   └── rename-to-ascii.sh   把音频文件名批量改成纯英文（可选）
 └── music/              音频文件夹（当前 3 首）
     ├── azhe-gou-ai.mp3
     ├── djaxuan-pian-ai.mp3
@@ -104,7 +103,7 @@ git push -u origin main
 - 仓库体积约 **12 MB**（三首 mp3 占绝大部分）—— 远低于 GitHub「单文件 25 MiB」的限制，一次拖完即可
 - `.nojekyll` 让 GitHub Pages 跳过 Jekyll 处理，**不要删**；上传时是隐藏文件，注意别漏掉
 - 线上改歌：直接在网页上编辑 `script.js` 顶部那 3 行，或在 `music/` 里传新文件后改 `file`
-- 部署完成后建议先打开 `/check.html` 自检一次，确认所有资源都能访问
+- 部署完成后，页面顶部的诊断条会自动自检，确认所有资源都能访问
 - Git 会永久保留历史，以后删歌仓库也不会变小（这个体量完全无所谓）
 
 ## 换其他内容
@@ -187,7 +186,7 @@ git push -u origin main
 ## 常见问题
 
 **Q：页面一直"加载中"，或者点了播放就卡死？**
-A：打开 **`https://你的用户名.github.io/仓库名/check.html`**，它会逐个检查所有资源并直接告诉你哪个出问题。
+A：打开站点本身，页面顶部的橙色诊断条会逐个检查所有资源并直接告诉你哪个出问题。
 
 页面顶部也会自动出现橙色诊断条，不需要开控制台：
 
@@ -207,7 +206,7 @@ https://你的用户名.github.io/仓库名/music/azhe-gou-ai.mp3
 能播放说明文件没问题；返回 404 就是没传上去或路径不对。
 
 **Q：打包上传时要注意什么？**
-A：把 `index.html`、`script.js`、`styles.css`、`check.html`、`avatar.jpg`、`qr.png`、`.nojekyll`
+A：把 `index.html`、`script.js`、`styles.css`、`rain.js`、`avatar.jpg`、`qr.png`、`.nojekyll`
 以及 `music/` 整个文件夹都传上去。**`.nojekyll` 必须传**，否则 GitHub Pages 会走 Jekyll 处理，
 可能把文件名改坏。用网页拖拽上传时，直接拖整个文件夹能保留目录结构。
 
