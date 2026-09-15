@@ -12,12 +12,13 @@
       结果就是只有最顶上那张卡片被打到。所以这里给**每张可见卡片**
       单独配一小股正上方的雨，保证每张卡片模块都有雨打上去。
 
-   3. 雨滴打在卡片上 → 卡片变湿
-      一滴雨打中卡片，就在那个位置形成一小块水渍（wet 值升高、慢慢风干）。
-      所以雨滴打在哪，哪儿就湿。
+   3. 雨滴打在卡片上（不再涂"水渍"色块）
+      一滴雨打中卡片，就在那个位置溅水花，并让水从那儿开始流。
       · 打中上边缘：当场溅水花，水沿上沿向两边铺开
       · 打中正面：溅水花，并在落点凝一颗水珠
       · 打中左右边 / 底边附近：额外补水，顺着边淌
+      内部仍维护 wet 网格（水珠滑过湿处会被拖慢），但**不画出来** ——
+      低透明度色块在深色卡片上会显成一片脏灰，只能靠水珠本身表达"湿"。
 
    4. 水珠沿卡片正面往下流（打哪流哪，不是只走边框！）
       每颗水珠盯住卡片上一个固定的"卡片内坐标 (lx, ly)"，
@@ -71,8 +72,8 @@
 
   // ---- 卡片 / 圆角参数 ----
   const R = 16;          // 卡片圆角，和 styles.css 里的 --radius 保持一致
-  const WET_CELL = 7;    // 水渍网格大小（逻辑像素）
-  const WET_MAX = 150;   // 单张卡片最多记多少块水渍（防止绘制/内存失控）
+  const WET_CELL = 7;    // "湿润度"网格大小（逻辑像素）——只做物理，不绘制
+  const WET_MAX = 150;   // 单张卡片最多记多少格（防止内存失控）
 
   // 判断某点是否落在（带圆角的）卡片可见区域内。
   // 用圆角矩形而不是外接矩形，雨滴才不会打在卡片外面的圆角空白上。
@@ -436,62 +437,24 @@
       ctx.stroke();
     }
 
-    // ===== 2. 卡片上的水渍（雨滴打在哪，哪就湿）=====
+    // ===== 2. 卡片上的水渍：只参与物理，**不绘制任何像素** =====
+    // ⚠️ 这一层以前是画出来的，现在故意什么都不画。原因记在这里，别再改回去：
+    //   · 水渍是一层低透明度的浅色斑。深色模式下卡片底色很暗，
+    //     浅色低透明度叠加后就是灰的 —— 在手机窄屏上看着就是
+    //     "卡片上一片片断断续续的灰色横线"。
+    //   · 画成按行合并的 fillRect（高 4.9px / 宽最多 42px / 行距 7px）时最明显，
+    //     是一道道虚线；改成圆斑后不成为直线了，但整块灰斑依然在，
+    //     在深色底上照样显脏。
+    //   · 结论：卡片"湿不湿"不该靠一层平的色块表达。
+    //     真正的水珠 + 拖尾 + 水花已经足够，雨滴直接打在卡片上更干净也更真实。
+    // wet 网格**保留**，因为水珠滑过湿处会被拖慢（真实流动感靠它），
+    // 它只是不再产生任何画面。
     for (const c of cardList) {
-      const { r, st } = c;
-      if (st.wet.size) {
-        wetDecay(st, 0.0075);                       // 慢慢风干
-        const rad = Math.min(R, r.width / 2, r.height / 2);
-        // 把同一行相邻的水渍格合并成一条，一次 fillRect 画完 —— 省掉大量绘制调用
-        const rows = new Map();                     // gy -> [gx...]
-        for (const key of st.wet.keys()) {
-          const sep = key.indexOf(":");
-          const gx = +key.slice(0, sep), gy = +key.slice(sep + 1);
-          // 跳过落在卡片圆角外的格
-          const lx = gx * WET_CELL + WET_CELL / 2;
-          const ly = gy * WET_CELL + WET_CELL / 2;
-          if (lx < rad && ly < rad) {
-            const dx = lx - rad, dy = ly - rad;
-            if (dx * dx + dy * dy > rad * rad) continue;
-          }
-          let arr = rows.get(gy);
-          if (!arr) { arr = []; rows.set(gy, arr); }
-          arr.push(gx);
-        }
-        // 单条合并 run 最多跨多少格。设上限是为了防止水渍沿某一行越积越多、
-        // 最后连成一整条横贯卡片的带子 —— 那种横带在手机滚动时看着像"移位"。
-        // 拆成小段后视觉上完全看不出接缝（水渍本身是很淡的软斑）。
-        const MAX_RUN = 6;
-        for (const [gy, xs] of rows) {
-          xs.sort((a, b) => a - b);
-          let runStart = xs[0], prev = xs[0], sum = 0, n = 0;
-          const flush = () => {
-            const avg = sum / n;
-            if (avg <= 0.06) return;
-            const x0 = runStart * WET_CELL;
-            const w = (prev - runStart + 1) * WET_CELL;
-            ctx.fillStyle = `rgba(255,255,255,${avg * 0.085})`;
-            ctx.fillRect(r.left + x0 + WET_CELL * 0.15,
-                         r.top + gy * WET_CELL + WET_CELL * 0.15,
-                         w - WET_CELL * 0.3, WET_CELL * 0.7);
-          };
-          for (const gx of xs) {
-            const v = st.wet.get(wetKey(gx, gy));
-            // 连续且没超过单段上限 → 继续并进这一段
-            if (gx === prev + 1 && (gx - runStart) < MAX_RUN) {
-              prev = gx; sum += v; n++;
-            } else {
-              flush(); runStart = prev = gx; sum = v; n = 1;
-            }
-          }
-          flush();
-        }
-      }
-      // 注意：这里**不要**再给卡片顶端画一条"积水面"。
-      // 那是一条贴着卡片上沿的横向细线，手机端滚动时画布是 fixed 的，
-      // 合成器与 canvas 不一定同帧绘制，滚动中会看到这条线明显"移位/抖动"。
-      // 卡片是否被打湿，靠水渍 + 水珠流动表达已经够了。
+      if (c.st.wet.size) wetDecay(c.st, 0.0075);   // 慢慢风干，顺带回收格子
     }
+    // 注意：也**不要**再给卡片顶端画一条"积水面"。那是一条贴着卡片上沿的
+    // 横向细线；canvas 是 fixed 浮层，手机滚动时和卡片不同帧上屏，
+    // 看起来就是这条线在卡片上滑动。
 
     // ===== 3a. 滴落到卡片下方、还没落地的小水点 =====
     for (let i = drops.length - 1; i >= 0; i--) {
