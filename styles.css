@@ -113,8 +113,8 @@ h2 { font-size: 1.1rem; }
   flex-direction: column;
   gap: 1px;
   min-width: 0;
-  /* 3 首歌不会溢出，靠 ::before/::after 的 auto 边距实现垂直居中。
-     这样写以后万一加到更多歌，也是"多出来能滚"，不会被卡片裁掉。
+  /* 4 首歌还放得下；再多就靠滚动，不会把卡片撑破。
+     居中用 ::before/::after 的 auto 边距实现。
      （不用 justify-content: center —— 它配合 overflow 会让顶部内容滚不到。） */
   max-height: 100%;
   overflow-y: auto;
