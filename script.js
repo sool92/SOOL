@@ -14,9 +14,9 @@
 // name 是界面上显示的歌名 —— 这里跟 music/ 里的文件名保持一致。
 // 换歌：把新文件放进 ./music/，然后改下面 3 行的 file 即可。
 const SONGS = [
-  { name: "1", artist: "阿泽",   file: "1.m4a" },
-  { name: "2", artist: "DJ阿轩", file: "2.mp3" },
-  { name: "3", artist: "DJ舒心", file: "3.mp3" },
+  { name: "1", artist: "SOOL", file: "1.m4a" },
+  { name: "2", artist: "SOOL", file: "2.mp3" },
+  { name: "3", artist: "SOOL", file: "3.mp3" },
 ];
 
 // ===== 2. 主题：自动跟随系统 + 记住手动选择 =====

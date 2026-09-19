@@ -52,9 +52,9 @@ npx serve .                    # 方式二：Node
 
 ```js
 const SONGS = [
-  { name: "1", artist: "阿泽",   file: "1.m4a" },
-  { name: "2", artist: "DJ阿轩", file: "2.mp3" },
-  { name: "3", artist: "DJ舒心", file: "3.mp3" },
+  { name: "1", artist: "SOOL", file: "1.m4a" },
+  { name: "2", artist: "SOOL", file: "2.mp3" },
+  { name: "3", artist: "SOOL", file: "3.mp3" },
 ];
 ```
 
@@ -67,7 +67,7 @@ const SONGS = [
 | 字段 | 说明 |
 |---|---|
 | `name` | 界面上显示的歌名，现在与 `music/` 里的文件名一致 |
-| `artist` | 歌手，显示用，随便写，不影响播放 |
+| `artist` | 歌手，显示用，随便写（本站三首都写 `SOOL`），不影响播放 |
 | `file` | **只写文件名**（要带扩展名），不用带 `music/` 前缀。必须和 `music/` 里的实际文件名完全一致 |
 
 换歌步骤：把新音频放进 `music/` → 把 `file` 改成新文件名 → 刷新页面。
