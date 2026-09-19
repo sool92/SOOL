@@ -58,6 +58,10 @@ body {
   padding: 24px;
 }
 
+/* 纯文字卡片（茫茫人海 / 人生苦短 / 个人声明）：标题和正文水平居中。
+   用独立类而不是改 .card，免得波及音乐卡 / 简介卡 / 顶部标题条。 */
+.text-card { text-align: center; }
+
 h1 { font-size: 1.4rem; }
 h2 { font-size: 1.1rem; }
 .muted { color: var(--muted); font-size: 0.95rem; overflow-wrap: break-word; }
