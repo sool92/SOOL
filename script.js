@@ -2,18 +2,20 @@
    个人主页 · 交互脚本
    ---------------------------------------------------------
    音乐播放器：默认 3 首，改歌只需修改下面的 SONGS 数组。
+   进站自动播放：能出声就直接放；被浏览器策略拦下时，
+   会在你第一次点击 / 触摸 / 按键时自动开始（详见第 4 节末尾）。
    不用配置、不用构建，直接上传 GitHub Pages 即可。
    ========================================================= */
 
 // ===== 1. 歌曲配置（固定 3 首，改这里就行）=====
 // file 只写"文件名"，不用带 music/ 前缀 —— 只要文件确实在 music/ 里。
-// 中文、空格、全角括号都会自动转义，不用自己处理。
+// 中文、空格、全角括号、纯数字（1.mp3）都会自动转义，不用自己处理。
 // 歌名 / 歌手随便写，只影响界面显示，不影响播放。
 // 换歌：把新文件放进 ./music/，然后改下面 3 行的 file 即可。
 const SONGS = [
-  { name: "够爱（DJ版）",     artist: "阿泽",   file: "azhe-gou-ai.mp3" },
-  { name: "偏爱（咚鼓版）",   artist: "DJ阿轩", file: "djaxuan-pian-ai.mp3" },
-  { name: "嘉宾（DJ舒心版）", artist: "DJ舒心", file: "djshuxin-jia-bin.mp3" },
+  { name: "够爱（DJ版）",     artist: "阿泽",   file: "1.mp3" },
+  { name: "偏爱（咚鼓版）",   artist: "DJ阿轩", file: "2.mp3" },
+  { name: "嘉宾（DJ舒心版）", artist: "DJ舒心", file: "3.mp3" },
 ];
 
 // ===== 2. 主题：自动跟随系统 + 记住手动选择 =====
@@ -199,8 +201,8 @@ const SONGS = [
     return n;
   }
 
-  // 加载指定曲目（不自动播放）
-  function load(i, autoplay) {
+  // 加载指定曲目（auto 为 true 时加载完接着播）
+  function load(i, auto) {
     current = (i + SONGS.length) % SONGS.length;
     const s = SONGS[current];
     const url = srcOf(s);
@@ -215,7 +217,7 @@ const SONGS = [
     highlight(current);
     store.set("index", current);
     updateMediaSession(s);
-    if (autoplay) play();
+    if (auto) play(true);
   }
 
   function next(auto) {
@@ -231,20 +233,31 @@ const SONGS = [
     load(shuffle ? randomIndex() : current - 1, true);
   }
 
-  function play() {
+  // 真正开始出声后的统一收尾（正常播放 / 拦截后补播都走这里）
+  function onPlaying() {
+    disarmAutoplay();                   // 已经放上了，不用再等"第一次操作"
+    card.classList.remove("loading");
+    card.classList.add("playing");
+    playBtn.setAttribute("aria-label", "暂停");
+    cover.classList.add("spin");
+    nowArtist.textContent = SONGS[current].artist;   // 抹掉"点一下开始播放"那句提示
+    document.title = `${SONGS[current].name} - ${SONGS[current].artist}`;
+    if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
+  }
+
+  // auto = 这次是不是"自动播放"发起的（用来区分：被拦下该不该弹错误）
+  function play(auto) {
     card.classList.add("loading");      // 先转圈，慢网下不至于以为点了没反应
     const p = audio.play();
     if (!p || !p.then) return;
-    p.then(() => {
+    p.then(onPlaying).catch((err) => {
       card.classList.remove("loading");
-      card.classList.add("playing");
-      playBtn.setAttribute("aria-label", "暂停");
-      cover.classList.add("spin");
-      document.title = `${SONGS[current].name} - ${SONGS[current].artist}`;
-      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
-    }).catch((err) => {
-      card.classList.remove("loading");
-      // 常见：文件不存在 / 浏览器自动播放限制
+      // NotAllowedError = 自动播放被浏览器拦下，这不是故障：
+      // 不弹失败提示，改成等用户第一次操作再放（见下面"自动播放"一节）。
+      if (auto && err && err.name === "NotAllowedError") { armAutoplay(); return; }
+      // AbortError = 播放被 pause() / 换源打断，属于正常操作，也不该报错
+      if (err && err.name === "AbortError") return;
+      // 其余才是真出错：文件不存在 / 解码失败 / 格式不支持
       console.warn("播放失败：", srcOf(SONGS[current]), err);
       fail("无法播放：" + (SONGS[current].file || "路径错误"));
     });
@@ -387,10 +400,38 @@ const SONGS = [
     const setHandler = (action, fn) => {
       try { navigator.mediaSession.setActionHandler(action, fn); } catch (e) { /* 不支持则忽略 */ }
     };
-    setHandler("play", play);
+    setHandler("play", () => play());   // 包一层：别把 action 参数当 auto 传进去
     setHandler("pause", pause);
     setHandler("previoustrack", prev);
     setHandler("nexttrack", () => next(false));
+  }
+
+  // ===== 自动播放 =====
+  // 现代浏览器（Chrome / Safari / Firefox）都禁止"用户还没跟本站交互过就出声"。
+  // 所以进站分两步走：
+  //   1. 先直接 play() —— 常来的站点、已"添加到主屏"的、以及部分浏览器会直接放行，
+  //      那就是"打开网页就自动播放"的效果
+  //   2. 被拦下（NotAllowedError）不算失败 —— 改挂一个监听：用户第一次
+  //      点击 / 触摸 / 按键时立刻开始播，这次一定带声音
+  // 落在播放器控件里的手势（播放键、列表、进度条、音量…）交给它们自己的逻辑，这里不抢，
+  // 否则"点播放键"会先被这里播一次、再被按钮暂停一次，互相打架。
+  const GESTURES = ["pointerdown", "touchend", "keydown", "click"];
+
+  function disarmAutoplay() {
+    GESTURES.forEach((t) => document.removeEventListener(t, onFirstGesture));
+  }
+
+  function onFirstGesture(e) {
+    const t = e.target;
+    if (t && t.closest && t.closest(".music-card")) return;   // 播放器内部自理
+    disarmAutoplay();
+    if (audio.paused) play();
+  }
+
+  function armAutoplay() {
+    disarmAutoplay();                             // 先清掉旧的，避免重复注册
+    nowArtist.textContent = "点一下页面开始播放";   // 不报错，只留一句提示（歌手名列表里还有）
+    GESTURES.forEach((t) => document.addEventListener(t, onFirstGesture));
   }
 
   // ---- 后台逐个读取每首歌的时长，写回列表（不改变当前播放状态）----
@@ -426,7 +467,10 @@ const SONGS = [
       if (i >= SONGS.length || Date.now() > DEADLINE) { finish(); return; }
 
       const idx = i++;
-      clearTimeout(timer);
+      clearTimeout(timer);            // 先清掉上一首的超时，否则跳过时它会迟到触发
+      // 正在播的那首不用探测：它自己会触发 loadedmetadata 填时长，
+      // 自动播放时别再去抢同一首歌的带宽（慢网下会让"一进站就卡"）。
+      if (idx === current && !audio.paused) { step(); return; }
       timer = setTimeout(() => {
         console.warn("[player] 读取时长超时，跳过：", SONGS[idx].file);
         step();
@@ -448,12 +492,13 @@ const SONGS = [
   }
 
   // ---- 启动 ----
-  // 回到上次听到的那首（只选中，不自动播放 —— 浏览器禁止未经交互自动出声）
+  // 回到上次听到的那首，并尝试自动播放
+  // （被浏览器拦下时不出错，改成等用户第一次点击 / 触摸 / 按键再开始）
   const savedIdx = parseInt(store.get("index", "0"), 10);
   current = Number.isInteger(savedIdx) && savedIdx >= 0 && savedIdx < SONGS.length ? savedIdx : 0;
 
   renderPlaylist();
-  load(current, false);
+  load(current, true);
   booted = true;
 
   // 等页面本身加载完再扫描时长，避免和首屏资源抢带宽
