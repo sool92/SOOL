@@ -122,7 +122,7 @@ const SONGS = [
   let loop    = false;   // 单曲循环
   let lastVol = 0.8;
 
-  // ---- 本地记忆（音量、上次听到哪首）----
+  // ---- 本地记忆（只记音量；曲目固定从第一首开始，不做记忆）----
   const store = {
     get(k, d) {
       try { const v = localStorage.getItem("player." + k); return v === null ? d : v; }
@@ -217,7 +217,6 @@ const SONGS = [
     nowArtist.textContent = s.artist;
     cover.textContent = "♪";
     highlight(current);
-    store.set("index", current);
     updateMediaSession(s);
     if (auto) play(true);
   }
@@ -494,10 +493,9 @@ const SONGS = [
   }
 
   // ---- 启动 ----
-  // 回到上次听到的那首，并尝试自动播放
+  // 固定从第一首开始（不记忆上次听到哪首），然后尝试自动播放
   // （被浏览器拦下时不出错，改成等用户第一次点击 / 触摸 / 按键再开始）
-  const savedIdx = parseInt(store.get("index", "0"), 10);
-  current = Number.isInteger(savedIdx) && savedIdx >= 0 && savedIdx < SONGS.length ? savedIdx : 0;
+  current = 0;
 
   renderPlaylist();
   load(current, true);
